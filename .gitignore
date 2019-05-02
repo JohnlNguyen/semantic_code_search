@@ -124,5 +124,5 @@ dmypy.json
 
 .nv/
 .local/
-.bash_history/
+.bash_history
 .keras/
