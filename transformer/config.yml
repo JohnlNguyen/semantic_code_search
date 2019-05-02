@@ -1,0 +1,18 @@
+model:
+  embed_dim: 512
+  hidden_dim: 512
+  ff_dim: 2048
+  num_layers: 6
+  attention_dim: 512
+  num_heads: 8
+  dropout_rate: 0.1
+training:
+  num_epochs: 10
+  print_freq: 25
+  lr: 2.0
+  warmup: 4000
+data:
+  batch_size: 10000
+  words_per_sequence: 200
+words:
+  vocab_cutoff: 0
