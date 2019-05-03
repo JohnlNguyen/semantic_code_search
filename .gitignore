@@ -126,3 +126,5 @@ dmypy.json
 .local/
 .bash_history
 .keras/
+data/
+.jupyter/

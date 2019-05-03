@@ -2,13 +2,90 @@ from pathlib import Path
 import logging
 import wget
 import pickle
-from typing import List, Callable, Union, Any
+import pandas as pd
+import numpy as np
+from typing import List, Callable, Union, Any, Dict
 from more_itertools import chunked
 from itertools import chain
 import nmslib
 from pathos.multiprocessing import Pool, cpu_count
 from math import ceil
+from collections import Counter
 
+class TokenList:
+    def __init__(self, token_list):
+        self.id2t = ['<PAD>', '<UNK>', '<S>', '</S>'] + token_list
+        self.t2id = {v: k for k, v in enumerate(self.id2t)}
+
+    def id(self, x):
+        return self.t2id.get(x, 1)
+
+    def token(self, x):
+        return self.id2t[x]
+
+    @property
+    def length(self):
+        return len(self.id2t)
+
+    @property
+    def start_id(self):
+        return 2
+
+    @property
+    def end_id(self):
+        return 3
+
+    def id(self, x): return self.t2id.get(x, 1)
+
+    def token(self, x): return self.id2t[x]
+
+    def num(self): return len(self.id2t)
+
+    def startid(self): return 2
+
+    def endid(self): return 3
+    
+def pad_to_longest(xs, tokens, max_len=999):
+    longest = min(len(max(xs, key=len))+2, max_len)
+    X = np.zeros((len(xs), longest), dtype='int32')
+    X[:,0] = tokens.start_id
+    for i, x in enumerate(xs):
+        x = x[:max_len-2]
+        for j, z in enumerate(x):
+            X[i,1+j] = tokens.id(z)
+        X[i,1+len(x)] = tokens.end_id
+    return X
+
+def create_token_map(data: List[str], delimiter=' ') -> Dict:
+    return Counter(create_word_list(data))
+
+def create_word_list(data: List[str], delimiter=' '):
+    return flattenlist([w.split(delimiter) for w in data])
+
+def build_vocab(word_dict: Dict, min_freq=5, outpath=None) -> TokenList:
+    # filter out word less than min_freq
+    word_list = list(list(zip(*filter(lambda wc: wc[1] >= min_freq, word_dict.items())))[0])
+    # save to file
+    if outpath != None:
+        pd.Series(word_list).to_csv(outpath, sep='\n')
+    return TokenList(word_list)
+
+def build_data(source_data, target_data, src_tokens, tar_tokens, delimiter=' ', h5_file=None, max_len=200):
+    if h5_file is not None and os.path.exists(h5_file):
+        print('loading', h5_file)
+        with h5py.File(h5_file) as dfile:
+            X, Y = dfile['X'][:], dfile['Y'][:]
+        return X, Y
+    
+    source = create_word_list(source_data)
+    target = create_word_list(target_data)
+    
+    X, Y = pad_to_longest(source, src_tokens, max_len), pad_to_longest(target, tar_tokens, max_len)
+    if h5_file is not None:
+        with h5py.File(h5_file, 'w') as dfile:
+            dfile.create_dataset('X', data=X)
+            dfile.create_dataset('Y', data=Y)
+    return X, Y
 
 def save_file_pickle(fname:str, obj:Any):
     with open(fname, 'wb') as f:

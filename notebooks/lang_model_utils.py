@@ -2,12 +2,17 @@ from pathlib import Path
 import logging
 from typing import List, Any
 from tqdm import tqdm_notebook
+from nltk.tokenize import RegexpTokenizer
 from keras.preprocessing.sequence import pad_sequences
 import torch
 import spacy
 from fastai.text import *
 EN = spacy.load('en')
 
+
+def tokenize_code(text: str) -> List[str]:
+    "A very basic procedure for tokenizing code strings."
+    return RegexpTokenizer(r'\w+').tokenize(text)
 
 def list_flatten(l: List[List[Any]]) -> List[Any]:
     "List[List] --> List"
