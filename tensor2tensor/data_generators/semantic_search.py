@@ -1,4 +1,5 @@
 import csv
+from pathlib import Path
 
 import pandas as pd
 import tensorflow as tf
@@ -10,6 +11,7 @@ from tensor2tensor.utils import metrics
 from tensor2tensor.utils import registry
 
 
+@registry.register_problem
 class Conala(text_problems.Text2TextProblem):
     """
 
@@ -21,7 +23,7 @@ class Conala(text_problems.Text2TextProblem):
 
     @property
     def test_file(self):
-        return ('{}/{}'.format(self.base_url, "conala-test.json"), "conala-test.json")
+        return '{}/{}'.format(self.base_url, "conala-test.json"), "conala-test.json"
 
     @property
     def file_names(self):
@@ -79,10 +81,18 @@ class Conala(text_problems.Text2TextProblem):
 
         for file_name in all_files:
             tf.logging.debug("Reading {}".format(file_name))
-            if ".json" in file_name:
+            if ".jsonl" in file_name:
+                contents = Path(file_name).read_text()
+                contents = contents.splitlines()
+                df = pd.DataFrame([dict(eval(x)) for x in contents])
+                for row in df.iterrows():
+                    yield Conala.get_row_content(row)
+            elif ".json" in file_name:
                 df = pd.read_json(file_name)
-                # TODO: return json file
+                for row in df.iterrows():
+                    yield Conala.get_row_content(row)
             else:
+                # TODO: Figure out how to handle django dataset
                 pass
 
     def eval_metrics(self):
@@ -90,3 +100,11 @@ class Conala(text_problems.Text2TextProblem):
             metrics.Metrics.ACC,
             metrics.Metrics.APPROX_BLEU
         ]
+
+    @classmethod
+    def get_row_content(cls, row):
+        if len(row) < 2:
+            raise Exception("Row does not have content")
+        row = row[1]
+        return {"inputs": row.snippet,
+                "targets": row.rewritten_intent if 'rewritten_intent' in row and row.rewritten_intent != None else row.intent}
