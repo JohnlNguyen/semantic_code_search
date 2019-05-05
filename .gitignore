@@ -1,6 +1,7 @@
 # Compiled python modules.
 *.pyc
-
+.idea/
+.vscode/
 # Byte-compiled
 _pycache__/
 .cache/

@@ -25,73 +25,78 @@ import tensorflow as tf
 
 @registry.register_problem
 class GithubFunctionDocstring(text_problems.Text2TextProblem):
-  """Function and Docstring similarity Problem.
+    """Function and Docstring similarity Problem.
 
-  This problem contains the data consisting of function
-  and docstring pairs as CSV files. The files are structured
-  such that they contain two columns without headers containing
-  the docstring tokens and function tokens. The delimiter is
-  ",".
-  """
-
-  @property
-  def base_url(self):
-    return "gs://kubeflow-examples/t2t-code-search/raw_data"
-
-  @property
-  def pair_files_list(self):
-    return [
-        [
-            "{}/func-doc-pairs-000{:02}-of-00100.csv".format(self.base_url, i),
-            ("func-doc-pairs-000{:02}-of-00100.csv".format(i),)
-        ]
-        for i in range(100)
-    ]
-
-  @property
-  def is_generate_per_split(self):
-    return False
-
-  @property
-  def approx_vocab_size(self):
-    return 2**13
-
-  @property
-  def max_samples_for_vocab(self):
-    # FIXME(sanyamkapoor): This exists to handle memory explosion.
-    return int(3.5e5)
-
-  def generate_samples(self, data_dir, tmp_dir, dataset_split):
-    """A generator to return data samples.Returns the data generator to return.
-
-
-    Args:
-      data_dir: A string representing the data directory.
-      tmp_dir: A string representing the temporary directory and is
-              used to download files if not already available.
-      dataset_split: Train, Test or Eval.
-
-    Yields:
-      Each element yielded is of a Python dict of the form
-        {"inputs": "STRING", "targets": "STRING"}
+    This problem contains the data consisting of function
+    and docstring pairs as CSV files. The files are structured
+    such that they contain two columns without headers containing
+    the docstring tokens and function tokens. The delimiter is
+    ",".
     """
 
-    # TODO(sanyamkapoor): Manually separate train/eval data set.
-    csv_file_names = self.pair_files_list
-    csv_files = [
-        generator_utils.maybe_download(tmp_dir, file_list[0], uri)
-        for uri, file_list in csv_file_names
-    ]
+    @property
+    def base_url(self):
+        return "gs://kubeflow-examples/t2t-code-search/raw_data"
 
-    for pairs_file in csv_files:
-      tf.logging.debug("Reading {}".format(pairs_file))
-      with open(pairs_file, "r") as csv_file:
-        for line in csv_file:
-          reader = csv.reader(StringIO(line))
-          for docstring_tokens, function_tokens in reader:
-            yield {"inputs": docstring_tokens, "targets": function_tokens}
+    @property
+    def pair_files_list(self):
+        """
+        This function returns a list of (url, file name) pairs
+        """
+        return [
+            [
+                "{}/func-doc-pairs-000{:02}-of-00100.csv".format(
+                    self.base_url, i),
+                ("func-doc-pairs-000{:02}-of-00100.csv".format(i),)
+            ]
+            for i in range(100)
+        ]
 
-  def eval_metrics(self):
-    return [
-        metrics.Metrics.ACC
-    ]
+    @property
+    def is_generate_per_split(self):
+        return False
+
+    @property
+    def approx_vocab_size(self):
+        return 2**13
+
+    @property
+    def max_samples_for_vocab(self):
+        # FIXME(sanyamkapoor): This exists to handle memory explosion.
+        return int(3.5e5)
+
+    def generate_samples(self, data_dir, tmp_dir, dataset_split):
+        """A generator to return data samples.Returns the data generator to return.
+
+
+        Args:
+          data_dir: A string representing the data directory.
+          tmp_dir: A string representing the temporary directory and is¬
+                  used to download files if not already available.
+          dataset_split: Train, Test or Eval.
+
+        Yields:
+          Each element yielded is of a Python dict of the form
+            {"inputs": "STRING", "targets": "STRING"}
+        """
+
+        # TODO(sanyamkapoor): Manually separate train/eval data set.
+        csv_file_names = self.pair_files_list
+        csv_files = [
+            generator_utils.maybe_download(tmp_dir, file_list[0], uri)
+            for uri, file_list in csv_file_names
+        ]
+
+        for pairs_file in csv_files:
+            tf.logging.debug("Reading {}".format(pairs_file))
+            with open(pairs_file, "r") as csv_file:
+                for line in csv_file:
+                    reader = csv.reader(StringIO(line))
+                    for docstring_tokens, function_tokens in reader:
+                        yield {"inputs": docstring_tokens, "targets": function_tokens}
+
+    def eval_metrics(self):
+        return [
+            metrics.Metrics.ACC,
+            metrics.Metrics.APPROX_BLEU
+        ]
