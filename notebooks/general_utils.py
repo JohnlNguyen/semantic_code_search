@@ -4,6 +4,9 @@ import wget
 import pickle
 import pandas as pd
 import numpy as np
+import random
+import os
+import h5py
 from typing import List, Callable, Union, Any, Dict
 from more_itertools import chunked
 from itertools import chain
@@ -29,22 +32,37 @@ class TokenList:
 
     @property
     def start_id(self):
+        """Index of '<S>'"""
         return 2
-
+ 
     @property
     def end_id(self):
+        """Index of '</S>'"""
         return 3
 
-    def id(self, x): return self.t2id.get(x, 1)
+    def id(self, x): 
+        return self.t2id.get(x, 1)
 
-    def token(self, x): return self.id2t[x]
+    def token(self, x): 
+        return self.id2t[x]
 
-    def num(self): return len(self.id2t)
+    def num(self): 
+        return len(self.id2t)
 
-    def startid(self): return 2
+    def startid(self): 
+        return self.start_id
 
-    def endid(self): return 3
+    def endid(self): 
+        return self.end_id
     
+def create_validation(source, target, validation_split=.10):
+    assert len(source) == len(target)
+    size = len(source)
+    indices = random.sample(range(0, size), k=int(size*validation_split))
+    source = [source[i] for i in indices]
+    target = [target[i] for i in indices]
+    return source, target
+
 def pad_to_longest(xs, tokens, max_len=999):
     longest = min(len(max(xs, key=len))+2, max_len)
     X = np.zeros((len(xs), longest), dtype='int32')
@@ -71,12 +89,6 @@ def build_vocab(word_dict: Dict, min_freq=5, outpath=None) -> TokenList:
     return TokenList(word_list)
 
 def build_data(source_data, target_data, src_tokens, tar_tokens, delimiter=' ', h5_file=None, max_len=200):
-    if h5_file is not None and os.path.exists(h5_file):
-        print('loading', h5_file)
-        with h5py.File(h5_file) as dfile:
-            X, Y = dfile['X'][:], dfile['Y'][:]
-        return X, Y
-    
     source = create_word_list(source_data)
     target = create_word_list(target_data)
     
@@ -87,6 +99,15 @@ def build_data(source_data, target_data, src_tokens, tar_tokens, delimiter=' ', 
             dfile.create_dataset('Y', data=Y)
     return X, Y
 
+def load_data(h5_file):
+    if os.path.exists(h5_file):
+        with h5py.File(h5_file) as dfile:
+            X, Y = dfile['X'][:], dfile['Y'][:]
+        logging.warning(f'Finished loading {h5_file}')
+        return X, Y
+    else:
+        logging.error(f'Cannot load {h5_file}')
+        
 def save_file_pickle(fname:str, obj:Any):
     with open(fname, 'wb') as f:
         pickle.dump(obj, f)
