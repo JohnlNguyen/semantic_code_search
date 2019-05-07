@@ -1,18 +1,23 @@
 import csv
 from pathlib import Path
 
+import os
 import pandas as pd
 import tensorflow as tf
 from six import StringIO
 
 from tensor2tensor.data_generators import generator_utils
 from tensor2tensor.data_generators import text_problems
+from tensor2tensor.data_generators.function_docstring import GithubFunctionDocstring
+from tensor2tensor.data_generators import problem
+from tensor2tensor.data_generators.extract_raw_data import extract_data
 from tensor2tensor.utils import metrics
 from tensor2tensor.utils import registry
-
+from nltk.tokenize import RegexpTokenizer
+from sklearn.model_selection import train_test_split
 
 @registry.register_problem
-class Conala(text_problems.Text2TextProblem):
+class SemanticSearch(text_problems.Text2TextProblem):
     """
 
     """
@@ -29,9 +34,7 @@ class Conala(text_problems.Text2TextProblem):
     def file_names(self):
         return [
             "conala-mined.jsonl",
-            "conala-train.json",
-            "django-all.anno",
-            "django-all.code"
+            "conala-train.json"
         ]
 
     @property
@@ -57,6 +60,31 @@ class Conala(text_problems.Text2TextProblem):
     def max_samples_for_vocab(self):
         return int(3.5e5)
 
+    def maybe_download_conala(self, tmp_dir):
+        all_files = [
+            generator_utils.maybe_download(tmp_dir, file_name, uri)
+            for uri, file_name in self.pair_files_list
+        ]
+        return all_files
+
+    def maybe_split_data(self, tmp_dir, extracted_files):
+        train_file, valid_file = 'conala-joined-prod-train.json', 'conala-joined-prod-valid.json'
+        if tf.gfile.Exists(train_file) or tf.gfile.Exists(valid_file):
+            tf.logging.info("Not splitting, file exists")
+            df = self.join_mined_and_train(tmp_dir, extracted_files)
+            train, valid = train_test_split(df, test_size=0.10, random_state=42)
+            train.to_json(train_file)
+            valid.to_json(valid_file)
+        return train_file, valid_file
+
+    def join_mined_and_train(self, tmp_dir, extracted_files):
+        df = pd.DataFrame([])
+        for extracted_file in extracted_files:
+            if 'test' not in extracted_file:
+                file_path = os.path.join(tmp_dir, extracted_file)
+                df = df.append(pd.read_json(file_path))
+        return df
+
     def generate_samples(self, data_dir, tmp_dir, dataset_split):
         """A generator to return data samples.Returns the data generator to return.
 
@@ -72,28 +100,23 @@ class Conala(text_problems.Text2TextProblem):
             {"inputs": "STRING", "targets": "STRING"}
         """
 
-        # TODO: Manually separate train/eval data set.
-        file_names = self.pair_files_list
-        all_files = [
-            generator_utils.maybe_download(tmp_dir, file_name, uri)
-            for uri, file_name in file_names
-        ]
+        self.maybe_download_conala(tmp_dir)
+        extracted_files = extract_data(tmp_dir, False)
+        train_filename, valid_filename = self.maybe_split_data(tmp_dir, extracted_files)
 
-        for file_name in all_files:
-            tf.logging.debug("Reading {}".format(file_name))
-            if ".jsonl" in file_name:
-                contents = Path(file_name).read_text()
-                contents = contents.splitlines()
-                df = pd.DataFrame([dict(eval(x)) for x in contents])
-                for row in df.iterrows():
-                    yield Conala.get_row_content(row)
-            elif ".json" in file_name:
-                df = pd.read_json(file_name)
-                for row in df.iterrows():
-                    yield Conala.get_row_content(row)
-            else:
-                # TODO: Figure out how to handle django dataset
-                pass
+        if dataset_split == problem.DatasetSplit.TRAIN:
+            df = pd.read_json(train_filename)
+            for row in df.iterrows():
+                yield {"inputs": " ".join(row.intent_tokens),
+                       "targets": " ".join(row.snippet_tokens)}
+        elif dataset_split == problem.DatasetSplit.EVAL:
+            df = pd.read_json(valid_filename)
+            for row in df.iterrows():
+                yield {"inputs": " ".join(row.intent_tokens),
+                       "targets": " ".join(row.snippet_tokens)}
+        else:
+            pass
+            # TODO: dataset split for test data
 
     def eval_metrics(self):
         return [
@@ -102,9 +125,14 @@ class Conala(text_problems.Text2TextProblem):
         ]
 
     @classmethod
-    def get_row_content(cls, row):
-        if len(row) < 2:
-            raise Exception("Row does not have content")
-        row = row[1]
-        return {"inputs": row.snippet,
-                "targets": row.rewritten_intent if 'rewritten_intent' in row and row.rewritten_intent != None else row.intent}
+    def github_data(cls, data_dir, tmp_dir, dataset_split):
+        """
+        Using data from function_docstring problem
+        """
+        github = GithubFunctionDocstring()
+        return github.generate_samples(data_dir, tmp_dir, dataset_split)
+
+    @classmethod
+    def tokenize_code(cls, text: str):
+        "A very basic procedure for tokenizing code strings."
+        return RegexpTokenizer(r'\w+').tokenize(text)
