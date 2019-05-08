@@ -1,4 +1,3 @@
-import csv
 from pathlib import Path
 
 import os
@@ -68,13 +67,16 @@ class SemanticSearch(text_problems.Text2TextProblem):
         return all_files
 
     def maybe_split_data(self, tmp_dir, extracted_files):
-        train_file, valid_file = 'conala-joined-prod-train.json', 'conala-joined-prod-valid.json'
+        train_file = os.path.join(tmp_dir, 'conala-joined-prod-train.json') 
+        valid_file = os.path.join(tmp_dir, 'conala-joined-prod-valid.json')
+        
         if tf.gfile.Exists(train_file) or tf.gfile.Exists(valid_file):
             tf.logging.info("Not splitting, file exists")
+        else:
             df = self.join_mined_and_train(tmp_dir, extracted_files)
             train, valid = train_test_split(df, test_size=0.10, random_state=42)
-            train.to_json(train_file)
-            valid.to_json(valid_file)
+            train[['intent_tokens','snippet_tokens']].to_json(train_file)
+            valid[['intent_tokens','snippet_tokens']].to_json(valid_file)
         return train_file, valid_file
 
     def join_mined_and_train(self, tmp_dir, extracted_files):
@@ -82,9 +84,9 @@ class SemanticSearch(text_problems.Text2TextProblem):
         for extracted_file in extracted_files:
             if 'test' not in extracted_file:
                 file_path = os.path.join(tmp_dir, extracted_file)
-                df = df.append(pd.read_json(file_path))
+                df = df.append(pd.read_json(file_path), ignore_index=True, sort=False)
         return df
-
+    
     def generate_samples(self, data_dir, tmp_dir, dataset_split):
         """A generator to return data samples.Returns the data generator to return.
 
@@ -106,12 +108,12 @@ class SemanticSearch(text_problems.Text2TextProblem):
 
         if dataset_split == problem.DatasetSplit.TRAIN:
             df = pd.read_json(train_filename)
-            for row in df.iterrows():
+            for row in df.itertuples():
                 yield {"inputs": " ".join(row.intent_tokens),
                        "targets": " ".join(row.snippet_tokens)}
         elif dataset_split == problem.DatasetSplit.EVAL:
             df = pd.read_json(valid_filename)
-            for row in df.iterrows():
+            for row in df.itertuples():
                 yield {"inputs": " ".join(row.intent_tokens),
                        "targets": " ".join(row.snippet_tokens)}
         else:

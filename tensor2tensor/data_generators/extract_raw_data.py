@@ -67,10 +67,7 @@ def extract_data(tmp_dir, print_data=False):
                         print('decoded_reconstr_code: %s' % decoded_reconstr_code)
 
                 except:
-                    print('*' * 20, file=sys.stderr)
-                    print(i, file=sys.stderr)
-                    print(intent, file=sys.stderr)
-                    print(snippet, file=sys.stderr)
+                    tf.logging.info("Error writing intent")
                     traceback.print_exc()
 
                     failed = True
