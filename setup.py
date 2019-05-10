@@ -57,6 +57,9 @@ setup(
         'tensorflow-datasets',
         'tensorflow-probability',
         'tqdm',
+        'pandas',
+        'nltk',
+        'sklearn',
     ],
     extras_require={
         'tensorflow': ['tensorflow>=1.13.1'],
