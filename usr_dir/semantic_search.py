@@ -9,17 +9,37 @@ from tensor2tensor.data_generators import generator_utils
 from tensor2tensor.data_generators import text_problems
 from tensor2tensor.data_generators.function_docstring import GithubFunctionDocstring
 from tensor2tensor.data_generators import problem
+from tensor2tensor.data_generators import translate
 from tensor2tensor.data_generators.extract_raw_data import extract_data
 from tensor2tensor.utils import metrics
 from tensor2tensor.utils import registry
 from nltk.tokenize import RegexpTokenizer
 from sklearn.model_selection import train_test_split
 
+_CONALA_TRAIN_DATASETS = [
+    [
+        "gs://conala/",
+        ("train/conala-train.intent",
+         "train/conala-train.code")
+    ],
+    [
+        "gs://conala/",
+        ("mined/conala-train-mined.intent", "mined/conala-train-mined.code")
+    ],
+]
+
+
 @registry.register_problem
 class SemanticSearch(text_problems.Text2TextProblem):
     """
 
     """
+    def __init__(self, was_reversed=False, was_copy=False):
+        super(SemanticSearch, self).__init__(was_reversed=False, was_copy=False)
+
+    @property
+    def vocab_type(self):
+        return text_problems.VocabType.TOKEN
 
     @property
     def base_url(self):
@@ -49,15 +69,11 @@ class SemanticSearch(text_problems.Text2TextProblem):
 
     @property
     def is_generate_per_split(self):
-        return False
+        return True
 
     @property
     def approx_vocab_size(self):
-        return 2 ** 13
-
-    @property
-    def max_samples_for_vocab(self):
-        return int(3.5e5)
+        return 2 ** 14  # ~16
 
     def maybe_download_conala(self, tmp_dir):
         all_files = [
@@ -66,17 +82,31 @@ class SemanticSearch(text_problems.Text2TextProblem):
         ]
         return all_files
 
-    def maybe_split_data(self, tmp_dir, extracted_files):
-        train_file = os.path.join(tmp_dir, 'conala-joined-prod-train.json') 
-        valid_file = os.path.join(tmp_dir, 'conala-joined-prod-valid.json')
-        
+    @property
+    def max_samples_for_vocab(self):
+        return int(3.5e5)
+
+    def maybe_split_data(self, tmp_dir, extracted_files, use_mined=True):
+
+        train_file = os.path.join(
+            tmp_dir, 'conala-joined-prod-train.json' if use_mined else 'conala-prod-train.json')
+        valid_file = os.path.join(
+            tmp_dir, 'conala-joined-prod-valid.json' if use_mined else 'conala-prod-valid.json')
+
         if tf.gfile.Exists(train_file) or tf.gfile.Exists(valid_file):
             tf.logging.info("Not splitting, file exists")
         else:
-            df = self.join_mined_and_train(tmp_dir, extracted_files)
-            train, valid = train_test_split(df, test_size=0.10, random_state=42)
-            train[['intent_tokens','snippet_tokens']].to_json(train_file)
-            valid[['intent_tokens','snippet_tokens']].to_json(valid_file)
+            if use_mined:
+                df = self.join_mined_and_train(tmp_dir, extracted_files)
+            else:
+                train_path = os.path.join(tmp_dir, 'conala-train.json.prod')
+                assert tf.gfile.Exists(train_path)
+                df = pd.read_json(train_path)
+
+            train, valid = train_test_split(
+                df, test_size=0.10, random_state=42)
+            train[['intent_tokens', 'snippet_tokens']].to_json(train_file)
+            valid[['intent_tokens', 'snippet_tokens']].to_json(valid_file)
         return train_file, valid_file
 
     def join_mined_and_train(self, tmp_dir, extracted_files):
@@ -84,9 +114,10 @@ class SemanticSearch(text_problems.Text2TextProblem):
         for extracted_file in extracted_files:
             if 'test' not in extracted_file:
                 file_path = os.path.join(tmp_dir, extracted_file)
-                df = df.append(pd.read_json(file_path), ignore_index=True, sort=False)
+                df = df.append(pd.read_json(file_path),
+                               ignore_index=True, sort=False)
         return df
-    
+
     def generate_samples(self, data_dir, tmp_dir, dataset_split):
         """A generator to return data samples.Returns the data generator to return.
 
@@ -104,7 +135,8 @@ class SemanticSearch(text_problems.Text2TextProblem):
 
         self.maybe_download_conala(tmp_dir)
         extracted_files = extract_data(tmp_dir, False)
-        train_filename, valid_filename = self.maybe_split_data(tmp_dir, extracted_files)
+        train_filename, valid_filename = self.maybe_split_data(
+            tmp_dir, extracted_files, use_mined=False)
 
         if dataset_split == problem.DatasetSplit.TRAIN:
             df = pd.read_json(train_filename)
@@ -114,21 +146,18 @@ class SemanticSearch(text_problems.Text2TextProblem):
             df = pd.read_json(valid_filename)
             for row in df.itertuples():
                 yield self.get_row(row, False)
-        else:
-            pass
-            # TODO: dataset split for test data
 
     def eval_metrics(self):
         return [
             metrics.Metrics.ACC,
             metrics.Metrics.APPROX_BLEU
         ]
-    
+
     def get_row(self, row, from_intent_to_code=True):
         if from_intent_to_code:
             return {"inputs": " ".join(row.intent_tokens), "targets": " ".join(row.snippet_tokens)}
         else:
-            return {"inputs": " ".join(row.snippet_tokens), "targets":  " ".join(row.intent_tokens)}
+            return {"inputs": " ".join(row.snippet_tokens), "targets": " ".join(row.intent_tokens)}
 
     @classmethod
     def github_data(cls, data_dir, tmp_dir, dataset_split):
@@ -138,7 +167,25 @@ class SemanticSearch(text_problems.Text2TextProblem):
         github = GithubFunctionDocstring()
         return github.generate_samples(data_dir, tmp_dir, dataset_split)
 
-    @classmethod
-    def tokenize_code(cls, text: str):
-        "A very basic procedure for tokenizing code strings."
-        return RegexpTokenizer(r'\w+').tokenize(text)
+
+
+@registry.register_problem
+class SemanticSearchTranslate(translate.TranslateProblem):
+    """
+    Structure this problem as a translate problem
+    """
+
+    @property
+    def max_samples_for_vocab(self):
+        return int(3.5e5)
+
+    @property
+    def is_generate_per_split(self):
+        return False
+
+    @property
+    def vocab_type(self):
+        return text_problems.VocabType.SUBWORD
+
+    def source_data_files(self, dataset_split):
+        return _CONALA_TRAIN_DATASETS
