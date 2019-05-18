@@ -3,6 +3,8 @@ from pathlib import Path
 import os
 import pandas as pd
 import tensorflow as tf
+import ast
+
 from six import StringIO
 
 from tensor2tensor.data_generators import generator_utils
@@ -31,8 +33,7 @@ def generate_vocab(tmp_dir, extracted_files):
     if tf.gfile.Exists(vocab_file):
         tf.logging.info("Skipping vocab generation, vocab file exists")
         return
-
-    vocab = []
+    vocab = ["UNK"]
     for file in extracted_files:
         file_path = os.path.join(tmp_dir, file)
         assert tf.gfile.Exists(file_path)
@@ -47,3 +48,8 @@ def generate_vocab(tmp_dir, extracted_files):
 def tokenize_code(cls, text: str):
     "A very basic procedure for tokenizing code strings."
     return RegexpTokenizer(r'\w+').tokenize(text)
+
+
+def generate_linearized_ast(code_snippet):
+    return ast.dump(ast.parse(code_snippet).body[0], annotate_fields=False)
+

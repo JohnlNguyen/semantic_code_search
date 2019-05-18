@@ -1,5 +1,5 @@
-DATA_DIR='/tf/t2t_data/tokens/'
-TRAIN_DIR='/tf/t2t_train/intent_to_code/conala-tokens/'
+DATA_DIR='/tf/t2t_data/tokens'
+TRAIN_DIR='/tf/t2t_train/intent_to_code/conala-tokens'
 TMP_DIR='/tf/datagen/'
 PROBLEM='semantic_search'
 USR_DIR='/tf/usr_dir'
@@ -12,7 +12,6 @@ t2t-datagen \
   --tmp_dir=$TMP_DIR \
   --problem=$PROBLEM
 
-
 t2t-trainer \
   --data_dir=$DATA_DIR \
   --problem=$PROBLEM \
@@ -20,4 +19,4 @@ t2t-trainer \
   --hparams_set=$HPARAMS \
   --output_dir=$TRAIN_DIR \
   --t2t_usr_dir=$USR_DIR \
-  --hparams="num_hidden_layers=6"
+  --hparams="num_hidden_layers=6,keep_checkpoint_max=3"

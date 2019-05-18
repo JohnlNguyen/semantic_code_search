@@ -75,6 +75,14 @@ class SemanticSearch(text_problems.Text2TextProblem):
     def approx_vocab_size(self):
         return 2 ** 14  # ~16
 
+    @property
+    def max_samples_for_vocab(self):
+        return int(3.5e5)
+
+    @property
+    def oov_token(self):
+        return "UNK"
+
     def maybe_download_conala(self, tmp_dir):
         all_files = [
             generator_utils.maybe_download(tmp_dir, file_name, uri)
@@ -82,9 +90,7 @@ class SemanticSearch(text_problems.Text2TextProblem):
         ]
         return all_files
 
-    @property
-    def max_samples_for_vocab(self):
-        return int(3.5e5)
+
 
     def maybe_split_data(self, tmp_dir, extracted_files, use_mined=True):
 
