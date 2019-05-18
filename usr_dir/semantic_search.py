@@ -16,6 +16,8 @@ from tensor2tensor.utils import registry
 from nltk.tokenize import RegexpTokenizer
 from sklearn.model_selection import train_test_split
 
+from usr_dir.utils import read_from_file
+
 _CONALA_TRAIN_DATASETS = [
     [
         "gs://conala/",
@@ -34,8 +36,10 @@ class SemanticSearch(text_problems.Text2TextProblem):
     """
 
     """
+
     def __init__(self, was_reversed=False, was_copy=False):
-        super(SemanticSearch, self).__init__(was_reversed=False, was_copy=False)
+        super(SemanticSearch, self).__init__(
+            was_reversed=False, was_copy=False)
 
     @property
     def vocab_type(self):
@@ -83,14 +87,20 @@ class SemanticSearch(text_problems.Text2TextProblem):
     def oov_token(self):
         return "UNK"
 
+    @classmethod
+    def github_data(cls, data_dir, tmp_dir, dataset_split):
+        """
+        Using data from function_docstring problem
+        """
+        github = GithubFunctionDocstring()
+        return github.generate_samples(data_dir, tmp_dir, dataset_split)
+
     def maybe_download_conala(self, tmp_dir):
         all_files = [
             generator_utils.maybe_download(tmp_dir, file_name, uri)
             for uri, file_name in self.pair_files_list
         ]
         return all_files
-
-
 
     def maybe_split_data(self, tmp_dir, extracted_files, use_mined=True):
 
@@ -138,20 +148,17 @@ class SemanticSearch(text_problems.Text2TextProblem):
           Each element yielded is of a Python dict of the form
             {"inputs": "STRING", "targets": "STRING"}
         """
-
-        self.maybe_download_conala(tmp_dir)
-        extracted_files = extract_data(tmp_dir, False)
-        train_filename, valid_filename = self.maybe_split_data(
-            tmp_dir, extracted_files, use_mined=False)
+        extracted_files, train_filename, valid_filename = self.process_files(
+            tmp_dir)
 
         if dataset_split == problem.DatasetSplit.TRAIN:
             df = pd.read_json(train_filename)
             for row in df.itertuples():
-                yield self.get_row(row, False)
+                yield self.get_row(row)
         elif dataset_split == problem.DatasetSplit.EVAL:
             df = pd.read_json(valid_filename)
             for row in df.itertuples():
-                yield self.get_row(row, False)
+                yield self.get_row(row)
 
     def eval_metrics(self):
         return [
@@ -159,31 +166,23 @@ class SemanticSearch(text_problems.Text2TextProblem):
             metrics.Metrics.APPROX_BLEU
         ]
 
-    def get_row(self, row, from_intent_to_code=True):
-        if from_intent_to_code:
-            return {"inputs": " ".join(row.intent_tokens), "targets": " ".join(row.snippet_tokens)}
-        else:
-            return {"inputs": " ".join(row.snippet_tokens), "targets": " ".join(row.intent_tokens)}
+    def get_row(self, row):
+        return {"inputs": " ".join(row.intent_tokens),
+                "targets": " ".join(row.snippet_tokens)}
 
-    @classmethod
-    def github_data(cls, data_dir, tmp_dir, dataset_split):
-        """
-        Using data from function_docstring problem
-        """
-        github = GithubFunctionDocstring()
-        return github.generate_samples(data_dir, tmp_dir, dataset_split)
-
+    def process_files(self, tmp_dir):
+        self.maybe_download_conala(tmp_dir)
+        extracted_files = extract_data(tmp_dir, False)
+        train_filename, valid_filename = self.maybe_split_data(
+            tmp_dir, extracted_files, use_mined=False)
+        return extracted_files, train_filename, valid_filename
 
 
 @registry.register_problem
-class SemanticSearchTranslate(translate.TranslateProblem):
+class SemanticSearchAst(SemanticSearch):
     """
     Structure this problem as a translate problem
     """
-
-    @property
-    def max_samples_for_vocab(self):
-        return int(3.5e5)
 
     @property
     def is_generate_per_split(self):
@@ -193,5 +192,17 @@ class SemanticSearchTranslate(translate.TranslateProblem):
     def vocab_type(self):
         return text_problems.VocabType.SUBWORD
 
-    def source_data_files(self, dataset_split):
-        return _CONALA_TRAIN_DATASETS
+    def generate_samples(self, data_dir, tmp_dir, dataset_split):
+
+        extracted_files, train_filename, valid_filename = self.process_files(
+            tmp_dir)
+
+        intent_path = os.path.join(tmp_dir, 'conala-train.json.prod')
+        ast_path = os.path.join(tmp_dir, 'conala-train-ast.txt')
+        assert tf.gfile.Exists(intent_path) and tf.gfile.Exists(ast_path)
+
+        intents = pd.read_json(intent_path).intent_tokens
+        ast_nodes = read_from_file(ast_path)
+
+        for intent_tokens, ast_node in zip(intents, ast_nodes):
+            yield {"inputs": " ".join(intent_tokens), "targets": ast_node}

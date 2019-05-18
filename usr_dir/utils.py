@@ -23,6 +23,10 @@ def write_to_file(file_name, data):
         for v in data:
             f.write(v + "\n")
 
+def read_from_file(file_name):
+    with open(file_name, 'r') as f:
+        return list(f)
+
 def generate_vocab(tmp_dir, extracted_files):
     if self.vocab_type != text_problems.VocabType.TOKEN:
         tf.logging.info(

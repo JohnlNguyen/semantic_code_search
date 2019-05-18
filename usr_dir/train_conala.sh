@@ -1,7 +1,7 @@
-DATA_DIR='/tf/t2t_data/tokens'
-TRAIN_DIR='/tf/t2t_train/intent_to_code/conala-tokens'
+DATA_DIR='/tf/t2t_data/ast'
+TRAIN_DIR='/tf/t2t_train/intent_to_code/conala-ast'
 TMP_DIR='/tf/datagen/'
-PROBLEM='semantic_search'
+PROBLEM='semantic_search_ast'
 USR_DIR='/tf/usr_dir'
 HPARAMS=transformer_base_single_gpu
 MODEL=transformer
@@ -19,4 +19,4 @@ t2t-trainer \
   --hparams_set=$HPARAMS \
   --output_dir=$TRAIN_DIR \
   --t2t_usr_dir=$USR_DIR \
-  --hparams="num_hidden_layers=6,keep_checkpoint_max=3"
+  --hparams="num_hidden_layers=6"
