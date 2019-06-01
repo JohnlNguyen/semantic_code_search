@@ -1,7 +1,7 @@
 DATA_DIR='/tf/t2t_data/tokens/'
 TRAIN_DIR='/tf/t2t_train/intent_to_code/conala-tokens/'
 TMP_DIR='/tf/datagen/'
-PROBLEM='semantic_search'
+PROBLEM='semantic_search_bpe'
 USR_DIR='/tf/usr_dir'
 HPARAMS=transformer_base_single_gpu
 MODEL=transformer

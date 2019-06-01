@@ -225,6 +225,7 @@ class SemanticSearchBpe(text_problems.Text2TextProblem):
     
     @property
     def vocab_filename(self):
+        print("Loading vocab file")
         return "conala.vocab"
 
     @property
@@ -341,6 +342,7 @@ class SemanticSearchBpe(text_problems.Text2TextProblem):
         with open(code_file, 'rb', encoding='utf-8') as fc:
             with open(intent_file, 'rb', encoding='utf-8') as fi:
                 for i, line in fc:
+                    print("Generating %s line of unmined", % i)
                     yield {"inputs": fi.readline(), "targets": line}
 
         code_file = os.path.join(data_dir, "mined/conala-train-mined-bpe-untagged.code")
@@ -348,6 +350,7 @@ class SemanticSearchBpe(text_problems.Text2TextProblem):
         with open(code_file, 'rb', encoding='utf-8') as fc:
             with open(intent_file, 'rb', encoding='utf-8') as fi:
                 for i, line in fc:
+                    print("Generating %s line of mined", % i)
                     yield {"inputs": fi.readline(), "targets": line}
 
     def eval_metrics(self):
