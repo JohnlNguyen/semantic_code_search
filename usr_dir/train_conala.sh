@@ -1,7 +1,7 @@
-DATA_DIR='/tf/t2t_data/ast'
-TRAIN_DIR='/tf/t2t_train/intent_to_code/conala-ast'
+DATA_DIR='/tf/t2t_data/bpe'
+TRAIN_DIR='/tf/t2t_train/intent_to_code/conala-bpe'
 TMP_DIR='/tf/datagen/'
-PROBLEM='semantic_search_ast'
+PROBLEM='semantic_search_bpe'
 USR_DIR='/tf/usr_dir'
 HPARAMS=transformer_base_single_gpu
 MODEL=transformer
