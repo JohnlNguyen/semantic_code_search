@@ -251,9 +251,9 @@ class SemanticSearchBpe(text_problems.Text2TextProblem):
     def approx_vocab_size(self):
         return 2 ** 14  # ~16
 
-    @property
-    def max_samples_for_vocab(self):
-        return int(3.5e5)
+ #   @property
+ #   def max_samples_for_vocab(self):
+ #       return int(3.5e5)
 
     @property
     def oov_token(self):
@@ -339,19 +339,19 @@ class SemanticSearchBpe(text_problems.Text2TextProblem):
         """
         code_file = os.path.join(data_dir, "train/conala-train-bpe-untagged.code")
         intent_file = os.path.join(data_dir, "train/conala-train-bpe-untagged.intent")
-        with open(code_file, 'rb', encoding='utf-8') as fc:
-            with open(intent_file, 'rb', encoding='utf-8') as fi:
-                for i, line in fc:
-                    print("Generating %s line of unmined", % i)
-                    yield {"inputs": fi.readline(), "targets": line}
+        with open(code_file, 'r', encoding='utf-8') as fc:
+            with open(intent_file, 'r', encoding='utf-8') as fi:
+                for i, line in enumerate(fc):
+                    print("Generating %s line of unmined" % i)
+                    yield {"inputs": fi.readline().lower(), "targets": line}
 
         code_file = os.path.join(data_dir, "mined/conala-train-mined-bpe-untagged.code")
         intent_file = os.path.join(data_dir, "mined/conala-train-mined-bpe-untagged.intent")
-        with open(code_file, 'rb', encoding='utf-8') as fc:
-            with open(intent_file, 'rb', encoding='utf-8') as fi:
-                for i, line in fc:
-                    print("Generating %s line of mined", % i)
-                    yield {"inputs": fi.readline(), "targets": line}
+        with open(code_file, 'r', encoding='utf-8') as fc:
+            with open(intent_file, 'r', encoding='utf-8') as fi:
+                for i, line in enumerate(fc):
+                    print("Generating %s line of mined" % i)
+                    yield {"inputs": fi.readline().lower(), "targets": line}
 
     def eval_metrics(self):
         return [
