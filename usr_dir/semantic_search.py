@@ -43,7 +43,7 @@ class SemanticSearch(text_problems.Text2TextProblem):
 
     @property
     def vocab_type(self):
-        return text_problems.VocabType.TOKEN
+        return text_problems.VocabType.SUBWORD
 
     @property
     def base_url(self):
